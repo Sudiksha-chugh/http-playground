@@ -11,6 +11,9 @@ const STATUS_TEXT = {
   500: 'Internal Server Error',
 };
 
+// A small mock dataset to paginate over
+const items = Array.from({ length: 25 }, (_, i) => ({ id: i + 1, name: `Item ${i + 1}` }));
+
 const routes = {
   'GET /': (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -33,9 +36,8 @@ const routes = {
 const server = http.createServer((req, res) => {
   console.log(req.method, req.url);
 
-  // Dynamic route: /status/:code -- can't live in the lookup table, has to be checked manually
   if (req.method === 'GET' && req.url.startsWith('/status/')) {
-    const parts = req.url.split('/'); // e.g. "/status/404" -> ['', 'status', '404']
+    const parts = req.url.split('/');
     const code = parseInt(parts[2], 10);
 
     if (!STATUS_TEXT[code]) {
@@ -50,6 +52,23 @@ const server = http.createServer((req, res) => {
 
     res.writeHead(code, { 'Content-Type': 'application/json', ...extraHeaders });
     res.end(JSON.stringify({ status: code, statusText: STATUS_TEXT[code] }));
+    return;
+  }
+
+  // NEW: query string parsing
+  if (req.method === 'GET' && req.url.startsWith('/pagination')) {
+    const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+    const page = parseInt(parsedUrl.searchParams.get('page') || '1', 10);
+    const limit = parseInt(parsedUrl.searchParams.get('limit') || '5', 10);
+
+    const start = (page - 1) * limit;
+    const pageItems = items.slice(start, start + limit);
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      data: pageItems,
+      meta: { page, limit, total: items.length },
+    }));
     return;
   }
 
