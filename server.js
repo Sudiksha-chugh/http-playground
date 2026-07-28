@@ -15,6 +15,7 @@ const STATUS_TEXT = {
 const items = Array.from({ length: 25 }, (_, i) => ({ id: i + 1, name: `Item ${i + 1}` }));
 
 const routes = {
+  
   'GET /': (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Welcome to the homepage!');
@@ -52,6 +53,30 @@ const server = http.createServer((req, res) => {
 
     res.writeHead(code, { 'Content-Type': 'application/json', ...extraHeaders });
     res.end(JSON.stringify({ status: code, statusText: STATUS_TEXT[code] }));
+    return;
+  }
+  // NEW: content negotiation based on the Accept header
+  if (req.method === 'GET' && req.url === '/negotiate') {
+    const accept = req.headers['accept'] || '';
+    const data = { id: 1, name: 'Widget', inStock: true };
+
+    if (accept.includes('application/xml')) {
+      const xml = `<item><id>${data.id}</id><name>${data.name}</name><inStock>${data.inStock}</inStock></item>`;
+      res.writeHead(200, { 'Content-Type': 'application/xml' });
+      res.end(xml);
+      return;
+    }
+
+    if (accept.includes('text/plain')) {
+      const text = `id=${data.id} name=${data.name} inStock=${data.inStock}`;
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end(text);
+      return;
+    }
+
+    // default: JSON
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
     return;
   }
 
