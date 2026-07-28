@@ -80,6 +80,25 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // NEW: ETag-based conditional caching
+  if (req.method === 'GET' && req.url === '/cached-resource') {
+    const crypto = require('crypto');
+    const resource = { id: 1, title: 'Caching in HTTP', updated: '2026-01-01' };
+    const body = JSON.stringify(resource);
+    const etag = crypto.createHash('sha1').update(body).digest('hex');
+
+    const clientEtag = req.headers['if-none-match'];
+
+    if (clientEtag === etag) {
+      res.writeHead(304, { 'ETag': etag });
+      res.end();
+      return;
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json', 'ETag': etag });
+    res.end(body);
+    return;
+  }
   // NEW: query string parsing
   if (req.method === 'GET' && req.url.startsWith('/pagination')) {
     const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
