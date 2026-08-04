@@ -1,0 +1,22 @@
+{
+  "name": "http-playground",
+  "version": "1.0.0",
+  "description": "",
+  "main": "jwt.js",
+"scripts": {
+  "start": "node server.js",
+  "dev": "node --watch server.js"
+},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sudiksha-chugh/http-playground.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Sudiksha-chugh/http-playground/issues"
+  },
+  "homepage": "https://github.com/Sudiksha-chugh/http-playground#readme"
+}

@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const jwt = require('./jwt');
 
 const STATUS_TEXT = {
   200: 'OK',
@@ -89,12 +90,47 @@ function handleRequest(req, res) {
       res.end();
       return;
     }
-
+   
     res.writeHead(200, { 'Content-Type': 'application/json', 'ETag': etag });
     res.end(body);
     return;
   }
+  if (req.method === 'POST' && req.url === '/login') {
+    let body = '';
+    req.on('data', (chunk) => { body += chunk; });
+    req.on('end', () => {
+      const { username, password } = JSON.parse(body);
 
+      // Hardcoded demo user -- in a real app this would check a database
+      if (username === 'alice' && password === 'wonderland') {
+        const token = jwt.sign({ sub: username, role: 'admin' });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ token }));
+      } else {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid credentials' }));
+      }
+    });
+    return;
+  }
+
+  if (req.method === 'GET' && req.url === '/protected') {
+    const authHeader = req.headers['authorization'] || '';
+    const token = authHeader.replace('Bearer ', '');
+
+    const payload = jwt.verify(token);
+
+    if (!payload) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid or missing token' }));
+      return;
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ message: `Welcome, ${payload.sub}!`, yourRole: payload.role }));
+    return;
+  }
+  
   if (req.method === 'GET' && req.url.startsWith('/pagination')) {
     const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
     const page = parseInt(parsedUrl.searchParams.get('page') || '1', 10);
