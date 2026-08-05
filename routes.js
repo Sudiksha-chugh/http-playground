@@ -175,6 +175,23 @@ if (req.method === 'POST' && req.url === '/session-login') {
     });
     return;
   }
+  if (req.method === 'GET' && req.url === '/old-page') {
+    res.writeHead(301, { 'Location': '/new-page' });
+    res.end();
+    return;
+  }
+
+  if (req.method === 'GET' && req.url === '/new-page') {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('You made it to the new page!');
+    return;
+  }
+
+  if (req.method === 'GET' && req.url === '/maybe-later') {
+    res.writeHead(302, { 'Location': '/new-page' });
+    res.end();
+    return;
+  }
   if (req.method === 'GET' && req.url === '/cached-resource') {
     const resource = { id: 1, title: 'Caching in HTTP', updated: '2026-01-01' };
     const body = JSON.stringify(resource);
