@@ -219,6 +219,14 @@ if (req.method === 'POST' && req.url === '/session-login') {
     }
     return;
   }
+  if (req.method === 'GET' && req.url === '/cors-demo') {
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*', // '*' = any website's JS can read this response
+    });
+    res.end(JSON.stringify({ message: 'If a browser fetched this from another origin, it would be allowed to read it.' }));
+    return;
+  }
   if (req.method === 'GET' && req.url === '/cached-resource') {
     const resource = { id: 1, title: 'Caching in HTTP', updated: '2026-01-01' };
     const body = JSON.stringify(resource);
