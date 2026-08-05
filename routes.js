@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const jwt = require('./jwt');
-
+crypto.randomUUID()
 const STATUS_TEXT = {
   200: 'OK',
   201: 'Created',
@@ -13,6 +13,7 @@ const STATUS_TEXT = {
 };
 
 const items = Array.from({ length: 25 }, (_, i) => ({ id: i + 1, name: `Item ${i + 1}` }));
+const sessions = new Map(); // sessionId -> { username, role }
 
 const routes = {
   'GET /': (req, res) => {
@@ -77,7 +78,43 @@ function handleRequest(req, res) {
     res.end(JSON.stringify(data));
     return;
   }
+if (req.method === 'POST' && req.url === '/session-login') {
+    let body = '';
+    req.on('data', (chunk) => { body += chunk; });
+    req.on('end', () => {
+      const { username, password } = JSON.parse(body);
 
+      if (username === 'alice' && password === 'wonderland') {
+        const sessionId = crypto.randomUUID();
+        sessions.set(sessionId, { username, role: 'admin' });
+
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Set-Cookie': `sessionId=${sessionId}; HttpOnly; Path=/`,
+        });
+        res.end(JSON.stringify({ message: 'Logged in via session cookie' }));
+      } else {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid credentials' }));
+      }
+    });
+    return;
+  }
+
+  if (req.method === 'GET' && req.url === '/whoami') {
+    const cookies = parseCookies(req);
+    const session = sessions.get(cookies.sessionId);
+
+    if (!session) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'No valid session' }));
+      return;
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ message: `You are ${session.username}`, role: session.role }));
+    return;
+  }
   if (req.method === 'GET' && req.url === '/cached-resource') {
     const resource = { id: 1, title: 'Caching in HTTP', updated: '2026-01-01' };
     const body = JSON.stringify(resource);
@@ -157,5 +194,16 @@ function handleRequest(req, res) {
     res.end('Not Found');
   }
 }
+function parseCookies(req) {
+  const header = req.headers.cookie;
+  const cookies = {};
+  if (!header) return cookies;
 
+  header.split(';').forEach((pair) => {
+    const [key, value] = pair.trim().split('=');
+    cookies[key] = value;
+  });
+
+  return cookies;
+}
 module.exports = handleRequest;
