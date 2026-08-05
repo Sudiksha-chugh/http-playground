@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const jwt = require('./jwt');
+const zlib = require('zlib');
 crypto.randomUUID()
 const STATUS_TEXT = {
   200: 'OK',
@@ -190,6 +191,32 @@ if (req.method === 'POST' && req.url === '/session-login') {
   if (req.method === 'GET' && req.url === '/maybe-later') {
     res.writeHead(302, { 'Location': '/new-page' });
     res.end();
+    return;
+  }
+  if (req.method === 'GET' && req.url === '/big-data') {
+    // Repeated data compresses very well -- good for demonstrating the size difference
+    const payload = JSON.stringify({
+      message: 'This is a fairly repetitive payload, on purpose.',
+      items: Array.from({ length: 200 }, (_, i) => ({ id: i, note: 'repeated text compresses well' })),
+    });
+
+    const acceptEncoding = req.headers['accept-encoding'] || '';
+
+    if (acceptEncoding.includes('gzip')) {
+      const compressed = zlib.gzipSync(payload);
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Content-Encoding': 'gzip',
+        'Content-Length': compressed.length,
+      });
+      res.end(compressed);
+    } else {
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+      });
+      res.end(payload);
+    }
     return;
   }
   if (req.method === 'GET' && req.url === '/cached-resource') {
