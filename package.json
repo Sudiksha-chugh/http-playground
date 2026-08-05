@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "",
   "main": "jwt.js",
-"scripts": {
-  "start": "node server.js",
-  "dev": "node --watch server.js"
-},
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Sudiksha-chugh/http-playground.git"
@@ -18,5 +18,8 @@
   "bugs": {
     "url": "https://github.com/Sudiksha-chugh/http-playground/issues"
   },
-  "homepage": "https://github.com/Sudiksha-chugh/http-playground#readme"
+  "homepage": "https://github.com/Sudiksha-chugh/http-playground#readme",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
 }
