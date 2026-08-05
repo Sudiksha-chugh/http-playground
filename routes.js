@@ -33,7 +33,9 @@ const routes = {
     });
   },
 };
-
+const rateLimitBuckets = new Map(); // ip -> { count, windowStart }
+const RATE_LIMIT_WINDOW_MS = 30_000; // 30 seconds
+const RATE_LIMIT_MAX = 5; // 5 requests per window
 function handleRequest(req, res) {
   console.log(req.method, req.url);
 
@@ -113,6 +115,33 @@ if (req.method === 'POST' && req.url === '/session-login') {
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ message: `You are ${session.username}`, role: session.role }));
+    return;
+  }
+  if (req.method === 'GET' && req.url === '/limited') {
+    const ip = req.socket.remoteAddress;
+    const now = Date.now();
+
+    let bucket = rateLimitBuckets.get(ip);
+
+    if (!bucket || now - bucket.windowStart > RATE_LIMIT_WINDOW_MS) {
+      bucket = { count: 0, windowStart: now };
+      rateLimitBuckets.set(ip, bucket);
+    }
+
+    bucket.count += 1;
+
+    if (bucket.count > RATE_LIMIT_MAX) {
+      const retryAfterSeconds = Math.ceil((bucket.windowStart + RATE_LIMIT_WINDOW_MS - now) / 1000);
+      res.writeHead(429, {
+        'Content-Type': 'application/json',
+        'Retry-After': String(retryAfterSeconds),
+      });
+      res.end(JSON.stringify({ error: 'Too many requests', retryAfterSeconds }));
+      return;
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ message: `Request ${bucket.count} of ${RATE_LIMIT_MAX} allowed this window` }));
     return;
   }
   if (req.method === 'GET' && req.url === '/cached-resource') {
