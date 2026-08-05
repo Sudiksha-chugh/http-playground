@@ -1,0 +1,191 @@
+{
+  "info": {
+    "name": "HTTP Playground - My Build",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "jwtToken", "value": "" },
+    { "key": "etagValue", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Basics",
+      "item": [
+        { "name": "GET /", "request": { "method": "GET", "url": "{{baseUrl}}/" } },
+        { "name": "GET /hello", "request": { "method": "GET", "url": "{{baseUrl}}/hello" } },
+        {
+          "name": "POST /echo",
+          "request": { "method": "POST", "url": "{{baseUrl}}/echo", "body": { "mode": "raw", "raw": "hello world" } }
+        }
+      ]
+    },
+    {
+      "name": "Status Codes",
+      "item": [
+        { "name": "GET /status/201", "request": { "method": "GET", "url": "{{baseUrl}}/status/201" } },
+        { "name": "GET /status/401", "request": { "method": "GET", "url": "{{baseUrl}}/status/401" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Has WWW-Authenticate', () => pm.expect(pm.response.headers.has('WWW-Authenticate')).to.be.true);"
+          ]}}]
+        },
+        { "name": "GET /status/429", "request": { "method": "GET", "url": "{{baseUrl}}/status/429" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Has Retry-After', () => pm.expect(pm.response.headers.has('Retry-After')).to.be.true);"
+          ]}}]
+        }
+      ]
+    },
+    {
+      "name": "Content Negotiation",
+      "item": [
+        { "name": "Accept: JSON", "request": { "method": "GET", "url": "{{baseUrl}}/negotiate", "header": [{ "key": "Accept", "value": "application/json" }] } },
+        { "name": "Accept: XML", "request": { "method": "GET", "url": "{{baseUrl}}/negotiate", "header": [{ "key": "Accept", "value": "application/xml" }] } },
+        { "name": "Accept: text/plain", "request": { "method": "GET", "url": "{{baseUrl}}/negotiate", "header": [{ "key": "Accept", "value": "text/plain" }] } }
+      ]
+    },
+    {
+      "name": "Caching",
+      "item": [
+        {
+          "name": "1. GET /cached-resource (capture ETag)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/cached-resource" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.collectionVariables.set('etagValue', pm.response.headers.get('ETag'));"
+          ]}}]
+        },
+        {
+          "name": "2. GET /cached-resource (conditional, expect 304)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/cached-resource", "header": [{ "key": "If-None-Match", "value": "{{etagValue}}" }] },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('304 Not Modified', () => pm.response.to.have.status(304));"
+          ]}}]
+        }
+      ]
+    },
+    {
+      "name": "Pagination",
+      "item": [
+        { "name": "GET /pagination?page=1&limit=5", "request": { "method": "GET", "url": "{{baseUrl}}/pagination?page=1&limit=5" } },
+        { "name": "GET /pagination?page=99&limit=5", "request": { "method": "GET", "url": "{{baseUrl}}/pagination?page=99&limit=5" } }
+      ]
+    },
+    {
+      "name": "Auth - JWT",
+      "item": [
+        {
+          "name": "1. POST /login",
+          "request": {
+            "method": "POST", "url": "{{baseUrl}}/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"alice\",\"password\":\"wonderland\"}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.collectionVariables.set('jwtToken', pm.response.json().token);"
+          ]}}]
+        },
+        {
+          "name": "2. GET /protected (with token)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/protected", "header": [{ "key": "Authorization", "value": "Bearer {{jwtToken}}" }] },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "3. GET /protected (no token, expect 401)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/protected" },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+          ]}}]
+        }
+      ]
+    },
+    {
+      "name": "Auth - Sessions",
+      "item": [
+        {
+          "name": "1. POST /session-login",
+          "request": {
+            "method": "POST", "url": "{{baseUrl}}/session-login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"alice\",\"password\":\"wonderland\"}" }
+          }
+        },
+        { "name": "2. GET /whoami (uses cookie jar)", "request": { "method": "GET", "url": "{{baseUrl}}/whoami" } }
+      ]
+    },
+    {
+      "name": "Rate Limiting",
+      "item": [
+        { "name": "GET /limited (run 6+ times to trigger 429)", "request": { "method": "GET", "url": "{{baseUrl}}/limited" } }
+      ]
+    },
+    {
+      "name": "Idempotency",
+      "item": [
+        {
+          "name": "1. POST /pay (first call)",
+          "request": {
+            "method": "POST", "url": "{{baseUrl}}/pay",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Idempotency-Key", "value": "demo-key-1" }],
+            "body": { "mode": "raw", "raw": "{\"amount\": 100}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.collectionVariables.set('firstPaymentId', pm.response.json().paymentId);"
+          ]}}]
+        },
+        {
+          "name": "2. POST /pay (same key, expect same paymentId)",
+          "request": {
+            "method": "POST", "url": "{{baseUrl}}/pay",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Idempotency-Key", "value": "demo-key-1" }],
+            "body": { "mode": "raw", "raw": "{\"amount\": 100}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Same paymentId', () => pm.expect(pm.response.json().paymentId).to.eql(pm.collectionVariables.get('firstPaymentId')));"
+          ]}}]
+        }
+      ]
+    },
+    {
+      "name": "Redirects",
+      "item": [
+        { "name": "GET /old-page (301)", "request": { "method": "GET", "url": "{{baseUrl}}/old-page" } },
+        { "name": "GET /maybe-later (302)", "request": { "method": "GET", "url": "{{baseUrl}}/maybe-later" } }
+      ]
+    },
+    {
+      "name": "Compression",
+      "item": [
+        { "name": "GET /big-data (gzip)", "request": { "method": "GET", "url": "{{baseUrl}}/big-data", "header": [{ "key": "Accept-Encoding", "value": "gzip" }] } }
+      ]
+    },
+    {
+      "name": "CORS",
+      "item": [
+        { "name": "GET /cors-demo", "request": { "method": "GET", "url": "{{baseUrl}}/cors-demo" } }
+      ]
+    },
+    {
+      "name": "SSE",
+      "item": [
+        { "name": "GET /live-updates (watch response stream)", "request": { "method": "GET", "url": "{{baseUrl}}/live-updates" } }
+      ]
+    },
+    {
+      "name": "File Upload",
+      "item": [
+        {
+          "name": "POST /upload (set a real file in the 'file' field)",
+          "request": {
+            "method": "POST", "url": "{{baseUrl}}/upload",
+            "body": { "mode": "formdata", "formdata": [
+              { "key": "note", "value": "hi there", "type": "text" },
+              { "key": "file", "type": "file", "src": "" }
+            ]}
+          }
+        }
+      ]
+    }
+  ]
+}
