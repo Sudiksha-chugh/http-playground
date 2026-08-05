@@ -14,6 +14,7 @@ const STATUS_TEXT = {
 
 const items = Array.from({ length: 25 }, (_, i) => ({ id: i + 1, name: `Item ${i + 1}` }));
 const sessions = new Map(); // sessionId -> { username, role }
+const idempotencyStore = new Map(); // idempotencyKey -> response body
 
 const routes = {
   'GET /': (req, res) => {
@@ -142,6 +143,36 @@ if (req.method === 'POST' && req.url === '/session-login') {
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ message: `Request ${bucket.count} of ${RATE_LIMIT_MAX} allowed this window` }));
+    return;
+  }
+  if (req.method === 'POST' && req.url === '/pay') {
+    const idempotencyKey = req.headers['idempotency-key'];
+
+    if (!idempotencyKey) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing Idempotency-Key header' }));
+      return;
+    }
+
+    if (idempotencyStore.has(idempotencyKey)) {
+      const cached = idempotencyStore.get(idempotencyKey);
+      res.writeHead(200, { 'Content-Type': 'application/json', 'X-Replay': 'true' });
+      res.end(JSON.stringify(cached));
+      return;
+    }
+
+    let body = '';
+    req.on('data', (chunk) => { body += chunk; });
+    req.on('end', () => {
+      const { amount } = JSON.parse(body);
+      const paymentId = crypto.randomUUID();
+      const result = { paymentId, amount, status: 'charged' };
+
+      idempotencyStore.set(idempotencyKey, result);
+
+      res.writeHead(201, { 'Content-Type': 'application/json', 'X-Replay': 'false' });
+      res.end(JSON.stringify(result));
+    });
     return;
   }
   if (req.method === 'GET' && req.url === '/cached-resource') {
