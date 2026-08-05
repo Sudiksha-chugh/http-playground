@@ -250,6 +250,48 @@ if (req.method === 'POST' && req.url === '/session-login') {
 
     return;
   }
+  if (req.method === 'POST' && req.url === '/upload') {
+    const contentType = req.headers['content-type'] || '';
+    const boundaryMatch = contentType.match(/boundary=(.+)$/);
+
+    if (!boundaryMatch) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Expected multipart/form-data with a boundary' }));
+      return;
+    }
+
+    const boundary = '--' + boundaryMatch[1];
+    const chunks = [];
+
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => {
+      const rawBody = Buffer.concat(chunks).toString('binary');
+      const parts = rawBody.split(boundary).slice(1, -1); // drop text before first boundary and after last
+
+      const fields = {};
+      const files = [];
+
+      for (const part of parts) {
+        const [rawHeaders, ...rest] = part.split('\r\n\r\n');
+        const content = rest.join('\r\n\r\n').replace(/\r\n$/, '');
+
+        const nameMatch = rawHeaders.match(/name="([^"]+)"/);
+        const filenameMatch = rawHeaders.match(/filename="([^"]+)"/);
+
+        if (!nameMatch) continue;
+
+        if (filenameMatch) {
+          files.push({ field: nameMatch[1], filename: filenameMatch[1], sizeBytes: Buffer.byteLength(content, 'binary') });
+        } else {
+          fields[nameMatch[1]] = content;
+        }
+      }
+
+      res.writeHead(201, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ message: 'Parsed multipart body', fields, files }));
+    });
+    return;
+  }
   if (req.method === 'GET' && req.url === '/cached-resource') {
     const resource = { id: 1, title: 'Caching in HTTP', updated: '2026-01-01' };
     const body = JSON.stringify(resource);
